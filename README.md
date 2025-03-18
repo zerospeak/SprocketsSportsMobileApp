@@ -1,4 +1,263 @@
 # Comprehensive Guide to Building a Sprocket Sports Mobile App
+Let's enhance this comprehensive guide with strategic technical flow diagrams to illustrate the architecture and component relationships.
+
+### Architecture Overview
+
+The Sprocket Sports Mobile application follows Clean Architecture principles, with a layered approach that separates concerns and promotes maintainability. Here's the high-level architectural overview:
+
+```mermaid
+flowchart TD
+    subgraph Client["Client Layer"]
+        direction TB
+        UI[Ionic/Angular Frontend]
+        style UI fill:#92D050,color:#000000
+    end
+    
+    subgraph API["API Layer"]
+        direction TB
+        Ctrl[Controllers]
+        Auth[Authentication]
+        style Ctrl fill:#0072C6,color:#ffffff
+        style Auth fill:#0072C6,color:#ffffff
+    end
+    
+    subgraph Application["Application Layer"]
+        direction TB
+        Services[Services]
+        DTOs[DTOs]
+        Commands[Commands]
+        Queries[Queries]
+        style Services fill:#B4A0FF,color:#000000
+        style DTOs fill:#B4A0FF,color:#000000
+        style Commands fill:#B4A0FF,color:#000000
+        style Queries fill:#B4A0FF,color:#000000
+    end
+    
+    subgraph Domain["Domain Layer"]
+        direction TB
+        Entities[Entities]
+        ValueObjects[Value Objects]
+        Enums[Enums]
+        Interfaces[Interfaces]
+        style Entities fill:#FFC000,color:#000000
+        style ValueObjects fill:#FFC000,color:#000000
+        style Enums fill:#FFC000,color:#000000
+        style Interfaces fill:#FFC000,color:#000000
+    end
+    
+    subgraph Infrastructure["Infrastructure Layer"]
+        direction TB
+        DB[(Database)]
+        Cache[(Cache)]
+        External[External Services]
+        style DB fill:#FF9900,color:#000000
+        style Cache fill:#FF9900,color:#000000
+        style External fill:#FF9900,color:#000000
+    end
+    
+    %% Dependencies flow inward
+    UI -->|HTTP/API Calls| Ctrl
+    Ctrl -->|Business Logic| Services
+    Services -->|Data Access| DB
+    Services <-->|State Management| Cache
+    Services <-->|Integration| External
+    Services -->|Domain Operations| Entities
+    Services -->|Validation| ValueObjects
+    Services -->|Configuration| Enums
+    Services -->|Dependencies| Interfaces
+    
+    %% Legend
+    subgraph Legend["Legend"]
+        direction TB
+        L1[Frontend Components]
+        L2[API Endpoints]
+        L3[Business Logic]
+        L4[Domain Models]
+        L5[Infrastructure Services]
+        
+        style L1 fill:#92D050,color:#000000
+        style L2 fill:#0072C6,color:#ffffff
+        style L3 fill:#B4A0FF,color:#000000
+        style L4 fill:#FFC000,color:#000000
+        style L5 fill:#FF9900,color:#000000
+    end
+```
+
+The diagram above illustrates the layered architecture of the Sprocket Sports Mobile application. Each layer is color-coded to represent different concerns:
+
+- Green represents client-facing components
+- Blue shows API endpoints and authentication
+- Purple indicates business logic and application services
+- Yellow represents domain models and core business rules
+- Orange highlights infrastructure services
+
+Notice how dependencies flow inward, with outer layers depending on inner ones, never the reverse. This ensures that business rules remain independent of infrastructure concerns.
+
+### Domain Layer Relationships
+
+Let's examine how entities relate within the domain layer:
+
+```mermaid
+classDiagram
+    Team "1" --> "*" Player : contains
+    Team --> SportType : has
+    Team --> AgeGroup : has
+    Team ..> ITeamRepository : uses
+    Team ..> IUnitOfWork : uses
+    
+    class Team {
+        +Guid Id
+        +string Name
+        +string Description
+        +SportType SportType
+        +AgeGroup AgeGroup
+        +IReadOnlyCollection~Player~ Players
+        +AddPlayer(Player player)
+        +RemovePlayer(Player player)
+        +UpdateDetails(string name, string description)
+    }
+    
+    class Player {
+        +string FirstName
+        +string LastName
+        +DateOnly BirthDate
+        +Position Position
+    }
+    
+    class SportType {
+        <<enumeration>>
+        Soccer
+        Basketball
+        Football
+        Baseball
+    }
+    
+    class AgeGroup {
+        <<enumeration>>
+        U8
+        U10
+        U12
+        U14
+        Adult
+    }
+```
+
+The class diagram above shows the relationships between domain entities using UML notation:
+
+- Solid arrows (-->) indicate composition relationships (Team contains Players)
+- Dotted arrows (..>) show dependencies (Team uses repositories)
+- The "1" to "*" notation indicates that one Team can have many Players
+- <<enumeration>> indicates fixed sets of values (SportType and AgeGroup)
+
+### Team Creation Flow
+
+Let's examine how team creation flows through different layers of the application:
+
+```mermaid
+sequenceDiagram
+    participant Client as Ionic Client
+    participant API as TeamsController
+    participant Service as TeamService
+    participant Repo as TeamRepository
+    participant DB as Database
+
+    Client->>+API: POST /api/teams
+    Note over Client,DB: Create Team Flow
+    
+    API->>+Service: CreateTeamAsync(createTeamDto)
+    Service->>+Repo: AddAsync(team)
+    Repo->>+DB: SaveChanges()
+    DB-->>-Repo: Success
+    Repo-->>-Service: Team Added
+    Service-->>-API: Return TeamId
+    API-->>-Client: CreatedAtAction Response
+
+    Note over Client,DB: Error Handling Path
+    API->>API: Log Error
+    API-->>Client: StatusCode 500 Response
+```
+
+The sequence diagram above illustrates the flow of creating a team, where:
+
+- Solid arrows (->>) represent method calls or requests
+- Dashed arrows (-->>) show responses or returns
+- Vertical bars show when each component is active
+- "CreatedAtAction" creates a response with the location URL for the newly created resource
+- Error handling follows a separate path with logging before returning to the client
+
+### Infrastructure Layer Interactions
+
+Finally, let's look at how the infrastructure layer handles database operations:
+
+```mermaid
+flowchart TD
+    subgraph Application["Application Layer"]
+        Service[TeamService]
+        style Service fill:#B4A0FF,color:#000000
+    end
+    
+    subgraph Infrastructure["Infrastructure Layer"]
+        Repo[TeamRepository]
+        UoW[UnitOfWork]
+        Cache[Cache Manager]
+        
+        style Repo fill:#FF9900,color:#000000
+        style UoW fill:#FF9900,color:#000000
+        style Cache fill:#FF9900,color:#000000
+    end
+    
+    subgraph Storage["Storage Layer"]
+        DB[(Database)]
+        Redis[(Redis Cache)]
+        
+        style DB fill:#FF0000,color:#ffffff
+        style Redis fill:#FF0000,color:#ffffff
+    end
+    
+    %% Main Flow
+    Service -->|"GetTeamById(id)"| Repo
+    Repo -->|"FindAsync()"| DB
+    DB -->|"Return Entity"| Repo
+    Repo -->|"Map to DTO"| Service
+    
+    %% Cache Flow
+    Service -.->|"Try Get From Cache"| Cache
+    Cache -.->|"Check"| Redis
+    Redis -.->|"Return Cached"| Cache
+    Cache -.->|"Return Cached Result"| Service
+    
+    %% Transaction Flow
+    Repo -->|"Begin Transaction"| UoW
+    UoW -->|"Commit/Rollback"| DB
+    
+    %% Legend
+    subgraph Legend["Legend"]
+        direction TB
+        L1[Application Services]
+        L2[Infrastructure Components]
+        L3[Storage Systems]
+        
+        style L1 fill:#B4A0FF,color:#000000
+        style L2 fill:#FF9900,color:#000000
+        style L3 fill:#FF0000,color:#ffffff
+    end
+```
+
+This infrastructure diagram shows three key flows:
+
+- Solid arrows (->) represent direct method calls and data flow
+- Dotted lines (-.->) indicate optional or cached operations
+- The color scheme follows our architecture layers:
+  - Purple represents application services
+  - Orange shows infrastructure components
+  - Red indicates storage systems
+
+
+
+The UnitOfWork pattern coordinates database transactions across multiple repositories, ensuring atomic operations when dealing with related entities. The Cache Manager provides a layer of caching using Redis, reducing database load for frequently accessed data.
+
+These diagrams collectively illustrate how the Clean Architecture principles are implemented in the Sprocket Sports Mobile application, from client requests through to database persistence, with clear separation of concerns and well-defined interfaces between layers.
+
 
 This guide will walk you through creating a robust, maintainable, and scalable mobile application for Sprocket Sports using modern software engineering principles and best practices.
 
